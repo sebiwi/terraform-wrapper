@@ -1,7 +1,7 @@
 class TerraformWrapper
 
   def get_layers
-    list_dirs.map { |dir| dir.gsub("/.terraform/", "") }
+    list_dirs.sort.map { |dir| dir.gsub("/.terraform/", "").gsub(".terraform", ".") }
   end
 
   def list_dirs
