@@ -7,6 +7,18 @@ class TerraformWrapper
   end
 
   def list_dirs
-    Dir.glob("**/*.tf")
+    Dir.glob("**/*.tf").map{ |dir| Dir.getwd + '/' + dir }
   end
+
+  def terraform
+    'terraform'
+  end
+
+  def terraform_init
+    get_layers.each do |layer|
+      Dir.chdir(layer)
+      %x{ #{terraform} init }
+    end
+  end
+
 end
