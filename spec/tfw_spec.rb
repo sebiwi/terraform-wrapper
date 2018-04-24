@@ -6,6 +6,7 @@ describe TerraformWrapper do
   let(:layers_dir) { working_dir + '/terraform_tests/test_layers' }
   let(:flat_dir) { working_dir + '/terraform_tests/test_flat' }
   let(:lines) { File.readlines(mock_file).map{ |line| line.gsub("\n",'') } }
+
   after do
     Dir.chdir(working_dir)
   end
@@ -31,34 +32,112 @@ describe TerraformWrapper do
     end
   end
 
-  describe '#terraform' do
-    subject { wrapper.terraform }
+  describe '#terraform_bin' do
+    subject { wrapper.terraform_bin }
     it { is_expected.to eq 'terraform' }
   end
-  describe '#terraform_init' do
+
+  describe '#run' do
     before do
       File.delete(mock_file) if File.exist?(mock_file)
-      allow(wrapper).to receive(:terraform).and_return("#{working_dir}/terraform.rb")
+      allow(wrapper).to receive(:terraform_bin).and_return("#{working_dir}/terraform.rb")
     end
+
     context 'in the root directory of a layered project' do
-      let(:result) {
+      let(:expected_lines) {
         ["#{layers_dir}/00_rg", 'init',
         "#{layers_dir}/01_network", 'init',
         "#{layers_dir}/02_vms", 'init'
         ] }
       it 'goes through all directories in the right order' do
         Dir.chdir(layers_dir)
-        wrapper.terraform_init
-        expect(lines).to eq result
+        wrapper.run ['init']
+        expect(lines).to eq expected_lines
       end
     end
+
     context 'in the root directory of a flat project' do
-      let(:result) { ["#{flat_dir}", 'init' ] }
+      let(:expected_lines) { ["#{flat_dir}", 'init' ] }
       it 'runs terraform init on the current (flat) directory' do
         Dir.chdir(flat_dir)
-        wrapper.terraform_init
-        expect(lines).to eq result
+        wrapper.run ['init']
+        expect(lines).to eq expected_lines
+      end
+    end
+
+
+    context 'when workspace new dev' do
+      it 'calls terraform with workspace new dev' do
+        Dir.chdir(layers_dir)
+        expect(wrapper).to receive(:terraform).with("workspace new dev").exactly(3).times
+        wrapper.run ['workspace', 'new', 'dev']
+      end
+    end
+
+    context 'when workspace new prod' do
+      it 'calls terraform with workspace new prod' do
+        Dir.chdir(layers_dir)
+        expect(wrapper).to receive(:terraform).with("workspace new prod").exactly(3).times
+        wrapper.run ['workspace', 'new', 'prod']
+      end
+    end
+
+    context 'when workspace select dev' do
+      it 'calls terraform with workspace select prod' do
+        Dir.chdir(layers_dir)
+        expect(wrapper).to receive(:terraform).with("workspace select prod").exactly(3).times
+        wrapper.run ['workspace', 'select', 'prod']
+      end
+    end
+
+    context 'when taint resource' do
+
+      context 'when executing on right workspace' do
+        it 'calls terraform taint on the resource' do
+          Dir.chdir flat_dir
+          expect(wrapper).to receive(:terraform).with("taint azurerm_apg.my_apg").once
+          wrapper.run ['prod', 'taint', 'azurerm_apg.my_apg']
+        end
+      end
+
+      context 'when executing on wrong workspace' do
+
+        it 'sends a warning as the workspace is wrong' do
+          Dir.chdir flat_dir
+          expect(wrapper).to receive(:print_stdout)
+          wrapper.run ['dev', 'taint', 'azurerm_apg.my_apg']
+        end
+      end
+
+    end
+
+    context 'when var file is needed (apply/destroy/plan)' do
+
+      context 'in flat dir' do
+        let(:expected_params) { 'apply --var-file prod.tfvars' }
+
+        it 'adds the var file with the same workspace name in command line' do
+          Dir.chdir flat_dir
+          expect(wrapper).to receive(:terraform).with(expected_params).once
+          wrapper.run ['prod', 'apply']
+        end
+      end
+
+      context 'in layered dir' do
+        let(:expected_params) { 'apply --var-file ../prod.tfvars' }
+
+        it 'adds the var file with the same workspace name in command line' do
+          Dir.chdir layers_dir
+          expect(wrapper).to receive(:terraform).with(expected_params).exactly(3).times
+          wrapper.run ['prod', 'apply']
+        end
       end
     end
   end
+  describe '#current_workspace' do
+    before { Dir.chdir flat_dir }
+    subject { wrapper.current_workspace }
+    it { is_expected.to eq 'prod' }
+  end
+
 end
