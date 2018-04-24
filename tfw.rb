@@ -1,3 +1,4 @@
+require 'open3'
 class TerraformWrapper
 
   NO_WORKSPACE_ACTIONS = ['init', 'workspace']
@@ -67,6 +68,7 @@ class TerraformWrapper
     list_dirs.sort
       .map { |file| File.dirname(file) }
       .select{ |dirname| ! dirname.include? 'modules/' }
+      .uniq
   end
 
   def list_dirs
@@ -78,6 +80,11 @@ class TerraformWrapper
   end
 
   def terraform params
-      %x{ #{terraform_bin + ' ' + params} }
+      #%x{ #{terraform_bin + ' ' + params} }
+    Open3.popen3 "#{terraform_bin + ' ' + params}" do |stdin, stdout, stderr, thread|
+      while line = stdout.gets
+        puts line
+      end
+    end
   end
 end
