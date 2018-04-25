@@ -3,6 +3,7 @@ class TerraformWrapper
 
   NO_WORKSPACE_ACTIONS = ['init', 'workspace']
   NEED_VARFILE_ACTIONS = ['plan', 'apply', 'destroy']
+  NEED_APPROVAL_ACTIONS = ['apply', 'destroy']
 
   def run params
     get_params params
@@ -27,11 +28,10 @@ class TerraformWrapper
   end
 
   def exec_terraform
-    if NEED_VARFILE_ACTIONS.include? @action
-      terraform(@params.join(' ') + ' --var-file ' + var_file)
-    else
-      terraform (@params.join(' '))
-    end
+    parameter_buffer = @params
+    parameter_buffer += ['--var-file', var_file] if NEED_VARFILE_ACTIONS.include? @action
+    parameter_buffer += ['--auto-approve'] if NEED_APPROVAL_ACTIONS.include? @action
+    terraform(parameter_buffer.join(' '))
   end
 
   def check_workspace!

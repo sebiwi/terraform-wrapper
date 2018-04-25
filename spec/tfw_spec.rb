@@ -111,10 +111,32 @@ describe TerraformWrapper do
 
     end
 
-    context 'when var file is needed (apply/destroy/plan)' do
+    context 'when var file is needed (plan)' do
 
       context 'in flat dir' do
-        let(:expected_params) { 'apply --var-file prod.tfvars' }
+        let(:expected_params) { 'plan --var-file prod.tfvars' }
+
+        it 'adds the var file with the same workspace name in command line' do
+          Dir.chdir flat_dir
+          expect(wrapper).to receive(:terraform).with(expected_params).once
+          wrapper.run ['prod', 'plan']
+        end
+      end
+
+      context 'in layered dir' do
+        let(:expected_params) { 'plan --var-file ../prod.tfvars' }
+
+        it 'adds the var file with the same workspace name in command line' do
+          Dir.chdir layers_dir
+          expect(wrapper).to receive(:terraform).with(expected_params).exactly(3).times
+          wrapper.run ['prod', 'plan']
+        end
+      end
+    end
+    context 'when var file and autoconfirmation are needed (apply/destroy)' do
+
+      context 'in flat dir apply' do
+        let(:expected_params) { 'apply --var-file prod.tfvars --auto-approve' }
 
         it 'adds the var file with the same workspace name in command line' do
           Dir.chdir flat_dir
@@ -123,8 +145,8 @@ describe TerraformWrapper do
         end
       end
 
-      context 'in layered dir' do
-        let(:expected_params) { 'apply --var-file ../prod.tfvars' }
+      context 'in layered dir apply' do
+        let(:expected_params) { 'apply --var-file ../prod.tfvars --auto-approve' }
 
         it 'adds the var file with the same workspace name in command line' do
           Dir.chdir layers_dir
@@ -132,6 +154,26 @@ describe TerraformWrapper do
           wrapper.run ['prod', 'apply']
         end
       end
+      context 'in flat dir destroy' do
+        let(:expected_params) { 'destroy --var-file prod.tfvars --auto-approve' }
+
+        it 'adds the var file with the same workspace name in command line' do
+          Dir.chdir flat_dir
+          expect(wrapper).to receive(:terraform).with(expected_params).once
+          wrapper.run ['prod', 'destroy']
+        end
+      end
+
+      context 'in layered dir destroy' do
+        let(:expected_params) { 'destroy --var-file ../prod.tfvars --auto-approve' }
+
+        it 'adds the var file with the same workspace name in command line' do
+          Dir.chdir layers_dir
+          expect(wrapper).to receive(:terraform).with(expected_params).exactly(3).times
+          wrapper.run ['prod', 'destroy']
+        end
+      end
+
     end
   end
   describe '#current_workspace' do
