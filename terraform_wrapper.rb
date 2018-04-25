@@ -1,7 +1,9 @@
 require 'open3'
+
 class TerraformWrapper
 
-  NO_WORKSPACE_ACTIONS = ['init', 'workspace']
+  TERRAFORM_ACTIONS = ['init', 'workspace', 'plan', 'apply', 'destroy']
+  TERRAFORM_ACTIONS_WITHOUT_WORKSPACE = ['init', 'workspace']
   NEED_VARFILE_ACTIONS = ['plan', 'apply', 'destroy']
   NEED_APPROVAL_ACTIONS = ['apply', 'destroy']
 
@@ -15,32 +17,37 @@ class TerraformWrapper
   end
 
   def get_params params
-    if NO_WORKSPACE_ACTIONS.include? params.first
-      @params = params
-      @action = params.first
-      @action_type = :no_workspace
+    if TERRAFORM_ACTIONS.include? params.first
+      @use_varfile = false
     else
       @workspace = params.shift
-      @action = params.first
-      @params = params
-      @action_type = :workspace
+      @use_varfile = true
     end
+    @params = params
+    @action = params.first
   end
 
   def exec_terraform
     parameter_buffer = @params
-    parameter_buffer += ['--var-file', var_file] if NEED_VARFILE_ACTIONS.include? @action
+    parameter_buffer += ['--var-file', var_file] if NEED_VARFILE_ACTIONS.include?(@action) && @use_varfile
     parameter_buffer += ['--auto-approve'] if NEED_APPROVAL_ACTIONS.include? @action
     terraform(parameter_buffer.join(' '))
   end
 
   def check_workspace!
-    return nil if @action_type == :no_workspace
-    wrong_layer if @workspace != current_workspace
+    return nil if TERRAFORM_ACTIONS_WITHOUT_WORKSPACE.include? @action
+    missing_workspace if @workspace == nil && current_workspace != nil
+    wrong_workspace if @workspace != current_workspace
   end
 
-  def wrong_layer
+  def missing_workspace
+    print_stdout("Workspace detected within your files. You should provide a workspace, dumbass.")
+    raise 'Workspace exception'
+  end
+
+  def wrong_workspace
     print_stdout("Working on wrong workspace (#{current_workspace}) on layer " + current_dir)
+    raise 'Workspace exception'
   end
 
   def current_dir
@@ -55,7 +62,6 @@ class TerraformWrapper
 
   def print_stdout msg
     puts msg
-    exit 1
   end
 
   def current_workspace
@@ -80,7 +86,6 @@ class TerraformWrapper
   end
 
   def terraform params
-      #%x{ #{terraform_bin + ' ' + params} }
     Open3.popen3 "#{terraform_bin + ' ' + params}" do |stdin, stdout, stderr, thread|
       while line = stdout.gets
         puts line

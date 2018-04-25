@@ -1,7 +1,11 @@
 #!/usr/bin/env ruby
 
-require_relative './tfw.rb'
+require_relative './terraform_wrapper.rb'
 
 tf = TerraformWrapper.new
 
-tf.run ARGV
+begin
+  tf.run ARGV
+rescue
+  exit 1
+end

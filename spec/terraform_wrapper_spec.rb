@@ -1,15 +1,13 @@
-require_relative '../tfw.rb'
+require_relative '../terraform_wrapper.rb'
+
 describe TerraformWrapper do
   let(:wrapper) { described_class.new }
   let(:mock_file) { '/tmp/terraform_mock_output' }
-  let(:working_dir) { Dir.getwd }
+  let(:working_dir) { File.expand_path('..', File.dirname(__FILE__)) }
   let(:layers_dir) { working_dir + '/terraform_tests/test_layers' }
   let(:flat_dir) { working_dir + '/terraform_tests/test_flat' }
+  let(:no_workspace_dir) { working_dir + '/terraform_tests/test_no_workspace' }
   let(:lines) { File.readlines(mock_file).map{ |line| line.gsub("\n",'') } }
-
-  after do
-    Dir.chdir(working_dir)
-  end
 
   describe '#get_layers' do
 
@@ -69,7 +67,12 @@ describe TerraformWrapper do
     context 'when workspace new dev' do
       it 'calls terraform with workspace new dev' do
         Dir.chdir(layers_dir)
-        expect(wrapper).to receive(:terraform).with("workspace new dev").exactly(3).times
+        expect(Dir).to receive(:chdir).ordered
+        expect(wrapper).to receive(:terraform).with("workspace new dev").ordered
+        expect(Dir).to receive(:chdir).ordered
+        expect(wrapper).to receive(:terraform).with("workspace new dev").ordered
+        expect(Dir).to receive(:chdir).ordered
+        expect(wrapper).to receive(:terraform).with("workspace new dev").ordered
         wrapper.run ['workspace', 'new', 'dev']
       end
     end
@@ -105,7 +108,7 @@ describe TerraformWrapper do
         it 'sends a warning as the workspace is wrong' do
           Dir.chdir flat_dir
           expect(wrapper).to receive(:print_stdout)
-          wrapper.run ['dev', 'taint', 'azurerm_apg.my_apg']
+          expect{ wrapper.run ['dev', 'taint', 'azurerm_apg.my_apg'] }.to raise_error('Workspace exception')
         end
       end
 
@@ -175,11 +178,44 @@ describe TerraformWrapper do
       end
 
     end
+    context 'when workspaces are not used' do
+      context 'when terraform plan' do
+        it 'calls terraform plan' do
+          allow(wrapper).to receive(:print_stdout)
+          Dir.chdir no_workspace_dir
+          expect(wrapper).to receive(:terraform).with('plan').exactly(3).times
+          wrapper.run ['plan']
+        end
+      end
+      context 'when terraform apply' do
+        it 'calls terraform apply' do
+          allow(wrapper).to receive(:print_stdout)
+          Dir.chdir no_workspace_dir
+          expect(wrapper).to receive(:terraform).with('apply --auto-approve').exactly(3).times
+          wrapper.run ['apply']
+        end
+      end
+      context 'when terraform destroy' do
+        it 'calls terraform destroy' do
+          allow(wrapper).to receive(:print_stdout)
+          Dir.chdir no_workspace_dir
+          expect(wrapper).to receive(:terraform).with('destroy --auto-approve').exactly(3).times
+          wrapper.run ['destroy']
+        end
+      end
+      context 'and .terraform/environment file exists' do
+        it 'displays an error message' do
+          allow(wrapper).to receive(:print_stdout)
+          Dir.chdir(layers_dir)
+          expect(wrapper).to receive(:missing_workspace).and_raise('Error')
+          expect{ wrapper.run ['plan']}.to raise_error('Error')
+        end
+      end
+    end
   end
   describe '#current_workspace' do
     before { Dir.chdir flat_dir }
     subject { wrapper.current_workspace }
     it { is_expected.to eq 'prod' }
   end
-
 end
