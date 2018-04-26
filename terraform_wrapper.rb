@@ -6,37 +6,44 @@ class TerraformWrapper
   TERRAFORM_ACTIONS_WITHOUT_WORKSPACE = ['init', 'workspace']
   NEED_VARFILE_ACTIONS = ['plan', 'apply', 'destroy']
   NEED_APPROVAL_ACTIONS = ['apply', 'destroy']
+  attr_reader :working_dir
 
   def run params
-    get_params params
-    get_layers.each do |layer|
+    @working_dir = Dir.getwd
+    prepare_params params
+    layers.each do |layer|
       Dir.chdir(layer)
       check_workspace!
-      exec_terraform
+      terraform @params.join(' ')
     end
   end
 
-  def get_params params
-    if TERRAFORM_ACTIONS.include? params.first
-      @use_varfile = false
-    else
-      @workspace = params.shift
-      @use_varfile = true
-    end
+  def prepare_params params
     @params = params
-    @action = params.first
+    if workspace_provided? @params
+      @workspace = @params.shift
+      @params += ['--var-file', var_file] if NEED_VARFILE_ACTIONS.include?(action)
+    else
+      if @params.include?('--var-file')
+        index = @params.index('--var-file')
+        var_file_path = Dir.getwd + '/' +  @params[ index + 1]
+        @params[index + 1 ] = var_file_path
+      end
+    end
+    @params += ['--auto-approve'] if NEED_APPROVAL_ACTIONS.include? action
   end
 
-  def exec_terraform
-    parameter_buffer = @params
-    parameter_buffer += ['--var-file', var_file] if NEED_VARFILE_ACTIONS.include?(@action) && @use_varfile
-    parameter_buffer += ['--auto-approve'] if NEED_APPROVAL_ACTIONS.include? @action
-    terraform(parameter_buffer.join(' '))
+  def action
+    @params.first
+  end
+
+  def workspace_provided? params
+    !TERRAFORM_ACTIONS.include?(params.first)
   end
 
   def check_workspace!
-    return nil if TERRAFORM_ACTIONS_WITHOUT_WORKSPACE.include? @action
-    missing_workspace if @workspace == nil && current_workspace != nil
+    return nil if TERRAFORM_ACTIONS_WITHOUT_WORKSPACE.include? action
+    missing_workspace if @workspace.nil?  && !current_workspace.nil?
     wrong_workspace if @workspace != current_workspace
   end
 
@@ -55,9 +62,10 @@ class TerraformWrapper
   end
 
   def var_file
-    file_name = "#{current_workspace}.tfvars"
-    return file_name if File.exists? file_name
-    "../#{file_name}"
+    file_name = "#{@workspace}.tfvars"
+    return working_dir + '/' +  file_name if File.exists?(working_dir + '/' + file_name)
+    return working_dir + '/../' + file_name if File.exists?(working_dir + '/../' + file_name)
+    raise 'Error'
   end
 
   def print_stdout msg
@@ -70,8 +78,8 @@ class TerraformWrapper
     end
   end
 
-  def get_layers
-    list_dirs.sort
+  def layers
+    @layers ||= list_dirs.sort
       .map { |file| File.dirname(file) }
       .select{ |dirname| ! dirname.include? 'modules/' }
       .uniq
@@ -86,7 +94,7 @@ class TerraformWrapper
   end
 
   def terraform params
-    Open3.popen3 "#{terraform_bin + ' ' + params}" do |stdin, stdout, stderr, thread|
+    Open3.popen3 [terraform_bin, params].join(' ') do |stdin, stdout, stderr, thread|
       while line = stdout.gets
         puts line
       end

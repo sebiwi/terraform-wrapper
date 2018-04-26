@@ -6,12 +6,13 @@ describe TerraformWrapper do
   let(:working_dir) { File.expand_path('..', File.dirname(__FILE__)) }
   let(:layers_dir) { working_dir + '/terraform_tests/test_layers' }
   let(:flat_dir) { working_dir + '/terraform_tests/test_flat' }
-  let(:no_workspace_dir) { working_dir + '/terraform_tests/test_no_workspace' }
+  let(:no_workspace_layers_dir) { working_dir + '/terraform_tests/test_no_workspace_layers' }
+  let(:no_workspace_flat_dir) { working_dir + '/terraform_tests/test_no_workspace_flat' }
   let(:lines) { File.readlines(mock_file).map{ |line| line.gsub("\n",'') } }
 
-  describe '#get_layers' do
+  describe '#layers' do
 
-    subject { wrapper.get_layers }
+    subject { wrapper.layers }
 
     context 'when current directory is the root of a layered terraform project' do
       before do
@@ -117,7 +118,7 @@ describe TerraformWrapper do
     context 'when var file is needed (plan)' do
 
       context 'in flat dir' do
-        let(:expected_params) { 'plan --var-file prod.tfvars' }
+        let(:expected_params) { "plan --var-file #{flat_dir}/prod.tfvars" }
 
         it 'adds the var file with the same workspace name in command line' do
           Dir.chdir flat_dir
@@ -127,7 +128,7 @@ describe TerraformWrapper do
       end
 
       context 'in layered dir' do
-        let(:expected_params) { 'plan --var-file ../prod.tfvars' }
+        let(:expected_params) { "plan --var-file #{layers_dir}/prod.tfvars" }
 
         it 'adds the var file with the same workspace name in command line' do
           Dir.chdir layers_dir
@@ -139,7 +140,7 @@ describe TerraformWrapper do
     context 'when var file and autoconfirmation are needed (apply/destroy)' do
 
       context 'in flat dir apply' do
-        let(:expected_params) { 'apply --var-file prod.tfvars --auto-approve' }
+        let(:expected_params) { "apply --var-file #{flat_dir}/prod.tfvars --auto-approve" }
 
         it 'adds the var file with the same workspace name in command line' do
           Dir.chdir flat_dir
@@ -149,7 +150,7 @@ describe TerraformWrapper do
       end
 
       context 'in layered dir apply' do
-        let(:expected_params) { 'apply --var-file ../prod.tfvars --auto-approve' }
+        let(:expected_params) { "apply --var-file #{layers_dir}/prod.tfvars --auto-approve" }
 
         it 'adds the var file with the same workspace name in command line' do
           Dir.chdir layers_dir
@@ -158,7 +159,7 @@ describe TerraformWrapper do
         end
       end
       context 'in flat dir destroy' do
-        let(:expected_params) { 'destroy --var-file prod.tfvars --auto-approve' }
+        let(:expected_params) { "destroy --var-file #{flat_dir}/prod.tfvars --auto-approve" }
 
         it 'adds the var file with the same workspace name in command line' do
           Dir.chdir flat_dir
@@ -168,7 +169,7 @@ describe TerraformWrapper do
       end
 
       context 'in layered dir destroy' do
-        let(:expected_params) { 'destroy --var-file ../prod.tfvars --auto-approve' }
+        let(:expected_params) { "destroy --var-file #{layers_dir}/prod.tfvars --auto-approve" }
 
         it 'adds the var file with the same workspace name in command line' do
           Dir.chdir layers_dir
@@ -182,7 +183,7 @@ describe TerraformWrapper do
       context 'when terraform plan' do
         it 'calls terraform plan' do
           allow(wrapper).to receive(:print_stdout)
-          Dir.chdir no_workspace_dir
+          Dir.chdir no_workspace_layers_dir
           expect(wrapper).to receive(:terraform).with('plan').exactly(3).times
           wrapper.run ['plan']
         end
@@ -190,7 +191,7 @@ describe TerraformWrapper do
       context 'when terraform apply' do
         it 'calls terraform apply' do
           allow(wrapper).to receive(:print_stdout)
-          Dir.chdir no_workspace_dir
+          Dir.chdir no_workspace_layers_dir
           expect(wrapper).to receive(:terraform).with('apply --auto-approve').exactly(3).times
           wrapper.run ['apply']
         end
@@ -198,7 +199,7 @@ describe TerraformWrapper do
       context 'when terraform destroy' do
         it 'calls terraform destroy' do
           allow(wrapper).to receive(:print_stdout)
-          Dir.chdir no_workspace_dir
+          Dir.chdir no_workspace_layers_dir
           expect(wrapper).to receive(:terraform).with('destroy --auto-approve').exactly(3).times
           wrapper.run ['destroy']
         end
@@ -210,6 +211,28 @@ describe TerraformWrapper do
           expect(wrapper).to receive(:missing_workspace).and_raise('Error')
           expect{ wrapper.run ['plan']}.to raise_error('Error')
         end
+      end
+      context 'when varfile is specified' do
+        it 'calls terraform plan' do
+          allow(wrapper).to receive(:print_stdout)
+          Dir.chdir no_workspace_layers_dir
+          expect(wrapper).to receive(:terraform).with("plan --var-file #{no_workspace_layers_dir}/vars.tfvars").exactly(3).times
+          wrapper.run ['plan', '--var-file', 'vars.tfvars']
+        end
+      context 'when varfile is specified and is in current directory' do
+        it 'calls terraform plan' do
+          allow(wrapper).to receive(:print_stdout)
+          Dir.chdir no_workspace_flat_dir
+          expect(wrapper).to receive(:terraform).with("plan --var-file #{no_workspace_flat_dir}/vars.tfvars").exactly(1).times
+          wrapper.run ['plan', '--var-file', 'vars.tfvars']
+        end
+        it 'calls terraform apply' do
+          allow(wrapper).to receive(:print_stdout)
+          Dir.chdir no_workspace_flat_dir
+          expect(wrapper).to receive(:terraform).with("apply --var-file #{no_workspace_flat_dir}/vars.tfvars --auto-approve").exactly(1).times
+          wrapper.run ['apply', '--var-file', 'vars.tfvars']
+        end
+      end
       end
     end
   end
