@@ -98,6 +98,9 @@ class TerraformWrapper
       while line = stdout.gets
         puts line
       end
+      while line = stderr.gets
+        puts line
+      end
     end
   end
 end
