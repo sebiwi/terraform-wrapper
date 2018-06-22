@@ -6,6 +6,7 @@ describe TerraformWrapper do
   let(:working_dir) { File.expand_path('..', File.dirname(__FILE__)) }
   let(:layers_dir) { working_dir + '/terraform_tests/test_layers' }
   let(:flat_dir) { working_dir + '/terraform_tests/test_flat' }
+  let(:flat_dir_no_var_file) { working_dir + '/terraform_tests/test_flat_no_var_file' }
   let(:no_workspace_layers_dir) { working_dir + '/terraform_tests/test_no_workspace_layers' }
   let(:no_workspace_flat_dir) { working_dir + '/terraform_tests/test_no_workspace_flat' }
   let(:lines) { File.readlines(mock_file).map{ |line| line.gsub("\n",'') } }
@@ -115,7 +116,7 @@ describe TerraformWrapper do
 
     end
 
-    context 'when var file is needed (plan)' do
+    context 'when var file is present (plan)' do
 
       context 'in flat dir' do
         let(:expected_params) { "plan --var-file #{flat_dir}/prod.tfvars" }
@@ -137,6 +138,23 @@ describe TerraformWrapper do
         end
       end
     end
+
+    context 'when var file does not exist' do
+      context 'in flat dir' do
+        let(:expected_params) { 'plan' }
+        it 'call terraform plan' do
+          Dir.chdir flat_dir_no_var_file
+          expect(wrapper).to receive(:terraform).with(expected_params).once
+          wrapper.run ['prod', 'plan']
+        end
+        it 'display an message' do
+          Dir.chdir flat_dir_no_var_file
+          expect(wrapper).to receive(:print_stdout).with('Var file not found')
+          wrapper.run ['prod', 'plan']
+        end
+      end
+    end
+
     context 'when var file and autoconfirmation are needed (apply/destroy)' do
 
       context 'in flat dir apply' do
@@ -179,6 +197,7 @@ describe TerraformWrapper do
       end
 
     end
+
     context 'when workspaces are not used' do
       context 'when terraform plan' do
         it 'calls terraform plan' do

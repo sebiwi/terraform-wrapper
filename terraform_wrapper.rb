@@ -22,7 +22,7 @@ class TerraformWrapper
     @params = params
     if workspace_provided? @params
       @workspace = @params.shift
-      @params += ['--var-file', var_file] if NEED_VARFILE_ACTIONS.include?(action)
+      @params += ['--var-file', var_file] if NEED_VARFILE_ACTIONS.include?(action) && !var_file.nil?
     else
       if @params.include?('--var-file')
         index = @params.index('--var-file')
@@ -65,7 +65,8 @@ class TerraformWrapper
     file_name = "#{@workspace}.tfvars"
     return working_dir + '/' +  file_name if File.exists?(working_dir + '/' + file_name)
     return working_dir + '/../' + file_name if File.exists?(working_dir + '/../' + file_name)
-    raise 'Error'
+    print_stdout 'Var file not found'
+    return  nil
   end
 
   def print_stdout msg
