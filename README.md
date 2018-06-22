@@ -3,6 +3,10 @@
 ## Purpose
 This wrapper's purpose is to run Terraform on a layered terraform project.
 
+# Requirements
+
+This wrapper need terraform version >= 0.11.4
+
 # Usage
 
 A layered Terraform project looks somewhat like this:
