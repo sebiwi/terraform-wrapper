@@ -9,6 +9,12 @@ describe TerraformWrapper do
   let(:no_workspace_layers_dir) { working_dir + '/terraform_tests/test_no_workspace_layers' }
   let(:no_workspace_flat_dir) { working_dir + '/terraform_tests/test_no_workspace_flat' }
   let(:lines) { File.readlines(mock_file).map{ |line| line.gsub("\n",'') } }
+  let(:layers_subdir) {
+    ["#{layers_dir}/00_rg",
+     "#{layers_dir}/01_network",
+     "#{layers_dir}/02_vms"
+    ]
+  }
 
   describe '#layers' do
 
@@ -66,14 +72,13 @@ describe TerraformWrapper do
 
 
     context 'when workspace new dev' do
+
       it 'calls terraform with workspace new dev' do
         Dir.chdir(layers_dir)
-        expect(Dir).to receive(:chdir).ordered
-        expect(wrapper).to receive(:terraform).with("workspace new dev").ordered
-        expect(Dir).to receive(:chdir).ordered
-        expect(wrapper).to receive(:terraform).with("workspace new dev").ordered
-        expect(Dir).to receive(:chdir).ordered
-        expect(wrapper).to receive(:terraform).with("workspace new dev").ordered
+        layers_subdir.each do |dir|
+          expect(Dir).to receive(:chdir).with(dir).ordered
+          expect(wrapper).to receive(:terraform).with("workspace new dev").ordered
+        end
         wrapper.run ['workspace', 'new', 'dev']
       end
     end
@@ -81,7 +86,10 @@ describe TerraformWrapper do
     context 'when workspace new prod' do
       it 'calls terraform with workspace new prod' do
         Dir.chdir(layers_dir)
-        expect(wrapper).to receive(:terraform).with("workspace new prod").exactly(3).times
+        layers_subdir.each do |dir|
+          expect(Dir).to receive(:chdir).with(dir).ordered
+          expect(wrapper).to receive(:terraform).with("workspace new prod").ordered
+        end
         wrapper.run ['workspace', 'new', 'prod']
       end
     end
@@ -153,8 +161,12 @@ describe TerraformWrapper do
         let(:expected_params) { "apply --var-file #{layers_dir}/prod.tfvars --auto-approve" }
 
         it 'adds the var file with the same workspace name in command line' do
+          allow(wrapper).to receive(:current_workspace).and_return('prod')
           Dir.chdir layers_dir
-          expect(wrapper).to receive(:terraform).with(expected_params).exactly(3).times
+          layers_subdir.each do |dir|
+            expect(Dir).to receive(:chdir).with(dir).ordered
+            expect(wrapper).to receive(:terraform).with(expected_params).ordered
+          end
           wrapper.run ['prod', 'apply']
         end
       end
