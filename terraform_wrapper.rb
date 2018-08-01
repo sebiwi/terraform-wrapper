@@ -11,6 +11,7 @@ class TerraformWrapper
   def run params
     @working_dir = Dir.getwd
     prepare_params params
+    layers.reverse! if action == 'destroy'
     layers.each do |layer|
       Dir.chdir(layer)
       check_workspace!

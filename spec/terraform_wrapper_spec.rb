@@ -49,19 +49,39 @@ describe TerraformWrapper do
     end
 
     context 'in the root directory of a layered project' do
-      let(:expected_lines) {
-        ["#{layers_dir}/00_rg", 'init',
-        "#{layers_dir}/01_network", 'init',
-        "#{layers_dir}/02_vms", 'init'
-        ] }
-      it 'goes through all directories in the right order' do
-        Dir.chdir(layers_dir)
-        wrapper.run ['init']
-        expect(lines).to eq expected_lines
+
+      before do
+        Dir.chdir(no_workspace_layers_dir)
+      end
+      context 'and init action' do
+        let(:expected_lines) {
+          ["#{no_workspace_layers_dir}/00_rg", 'init',
+          "#{no_workspace_layers_dir}/01_network", 'init',
+          "#{no_workspace_layers_dir}/02_vms", 'init'
+          ] }
+
+        it 'goes through all directories in the right order' do
+          wrapper.run ['init']
+          expect(lines).to eq expected_lines
+        end
+      end
+      context 'and destroy action' do
+        let(:expected_lines) {
+          ["#{no_workspace_layers_dir}/02_vms", 'destroy --auto-approve',
+            "#{no_workspace_layers_dir}/01_network", 'destroy --auto-approve',
+            "#{no_workspace_layers_dir}/00_rg", 'destroy --auto-approve'
+          ] }
+
+        it 'goes through all directories in reverse order' do
+          wrapper.run ['destroy']
+          expect(lines).to eq expected_lines
+        end
       end
     end
 
-    context 'in the root directory of a flat project' do
+
+
+    context 'in the root directory of a flat project and init action' do
       let(:expected_lines) { ["#{flat_dir}", 'init' ] }
       it 'runs terraform init on the current (flat) directory' do
         Dir.chdir(flat_dir)
@@ -184,8 +204,12 @@ describe TerraformWrapper do
         let(:expected_params) { "destroy --var-file #{layers_dir}/prod.tfvars --auto-approve" }
 
         it 'adds the var file with the same workspace name in command line' do
+          allow(wrapper).to receive(:current_workspace).and_return('prod')
           Dir.chdir layers_dir
-          expect(wrapper).to receive(:terraform).with(expected_params).exactly(3).times
+          layers_subdir.reverse.each do |dir|
+            expect(Dir).to receive(:chdir).with(dir).ordered
+            expect(wrapper).to receive(:terraform).with(expected_params).ordered
+          end
           wrapper.run ['prod', 'destroy']
         end
       end
