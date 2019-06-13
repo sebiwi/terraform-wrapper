@@ -3,6 +3,13 @@
 ## Purpose
 This wrapper's purpose is to run Terraform on a layered terraform project.
 
+# Installation
+
+Just clone the project, and symlink the tf.rb file somewhere in your path, like so:
+ * `ln -s <terraform_wrapper_directory>/tf.rb /usr/local/bin/tf`
+ 
+Remember to use the full path to your terraform-wrapper’s directory.
+
 # Usage
 
 A layered Terraform project looks somewhat like this:
